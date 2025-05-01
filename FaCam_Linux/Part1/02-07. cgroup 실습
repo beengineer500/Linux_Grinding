@@ -1,0 +1,68 @@
+- 실습
+  - 실습 환경 : ubuntu 24.04
+  - stress tool 로 Cpu 로드를 생성 -> CPU 사용량 10% 제한
+    - cpu.cfs_period_us = 100000
+    - cpu.cfs_quota_us = 10000
+
+---
+
+### 1. croup version확인
+```bash
+# cgroup ver 확인
+mount | grep cgroup
+```
+- cgroup v2 사용 중인 경우
+	- `cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime)`
+		- `type cgroup2`가 표시된다.
+- ✔️ cgroup v1 사용 중인 경우
+- `cgroup on /sys/fs/cgroup/cpu type cgroup (rw,...)`  
+  `cgroup on /sys/fs/cgroup/memory type cgroup (rw,...)`
+	- `cgroup`이 여러 하위 리소스(`cpu`, `memory` 등)로 분리되어 있다.
+
+- ubuntu24.04는 기본적으로 cgroupv2를 사용한다.
+  cgroupv2로 전환해서 사용도 가능한데 현재, AWS EC2 인스턴스를 사용하기 때문에 일반적으로 수행하는 방법과 차이가 있다.
+
+- docker, kubernetes, EKS에서 안정적으로 제공하는 것은 cgroupv1이기 때문에, 
+  cgroupv1로 전환해서 실습을 이어간다.
+
+
+## 실습
+
+```bash
+sudo apt update
+sudo apt install -y stress
+
+sudo su -
+cd /sys/fs/cgroup/cpu
+
+mkdir utils
+
+cat tasks
+echo $$
+echo $$ >> tasks
+
+cat cpu.cfs_period_us # 100000
+cat cpu.cfs_quota_us  # -1
+
+stress -c 1
+
+
+echo 10000 > cpu.cfs_quota_us
+cat cpu.cfs_quota_us  # 10000
+
+stress -c 1
+```
+
+- 쉘에서 커맨드를 실행하면, 해당 쉘의 자식 프로세스로 실행된다.
+- cgroup은 부모 프로세스로부터 상속이 되기 때문에, 자식 프로세스에도 동일하게 적용된다.
+- 따라서, 우리는 현재 쉘에 cgruop을 걸고, stress 커맨드를 실행하면 cgroup이 상속되도록 하는 방식으로 실습을 진행한다.
+
+
+### 결과
+- cgroup 적용 전 `stress`
+	- `%CPU` 가 제한 없이 `99.9` 까지 사용하는 것을 확인할수 있다.
+  - (img 첨부 예정)
+
+- cgourp 적용 후 `stress`
+	- `stress` 의 `%CPU` 가 10으로 제한이 걸리는 것을 확인할 수 있다.
+  - (img 첨부 예정)
